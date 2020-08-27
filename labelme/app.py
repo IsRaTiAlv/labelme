@@ -17,10 +17,10 @@ from labelme import __appname__
 from labelme import PY2
 from labelme import QT5
 
-from . import utils
-from labelme.config import get_config
-from labelme.label_file import LabelFile
-from labelme.label_file import LabelFileError
+import utils
+from config import get_config
+from label_file import LabelFile
+from label_file import LabelFileError
 from labelme.logger import logger
 from labelme.shape import Shape
 from labelme.widgets import BrightnessContrastDialog
@@ -219,7 +219,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.openFile,
             shortcuts["open"],
             "open",
-            self.tr("Open image or label file"),
+            self.tr("Abrir imagen or label file"),
         )
         opendir = action(
             self.tr("&Open Dir"),
@@ -314,6 +314,14 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         toggle_keep_prev_mode.setChecked(self._config["keep_prev"])
 
+        predictMode = action(                                                   # Test
+            self.tr("Predict"),
+            lambda: self.predict(),
+            # shortcuts["create_polygon"],
+            "objects",
+            self.tr("Make an inference"),
+            enabled=False,
+        )
         createMode = action(
             self.tr("Create Polygons"),
             lambda: self.toggleDrawMode(False, createMode="polygon"),
@@ -572,6 +580,7 @@ class MainWindow(QtWidgets.QMainWindow):
             addPointToEdge=addPointToEdge,
             removePoint=removePoint,
             createMode=createMode,
+            predictMode=predictMode,                                          # test
             editMode=editMode,
             createRectangleMode=createRectangleMode,
             createCircleMode=createCircleMode,
@@ -623,6 +632,7 @@ class MainWindow(QtWidgets.QMainWindow):
             onLoadActive=(
                 close,
                 createMode,
+                predictMode,
                 createRectangleMode,
                 createCircleMode,
                 createLineMode,
@@ -640,6 +650,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menus = utils.struct(
             file=self.menu(self.tr("&File")),
             edit=self.menu(self.tr("&Edit")),
+            autolabel=self.menu(self.tr("&Autolabel")),
             view=self.menu(self.tr("&View")),
             help=self.menu(self.tr("&Help")),
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
@@ -665,7 +676,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 quit,
             ),
         )
-        utils.addActions(self.menus.help, (help,))
+        utils.addActions(
+            self.menus.help,
+            (
+                help,))
         utils.addActions(
             self.menus.view,
             (
@@ -689,7 +703,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 brightnessContrast,
             ),
         )
-
+        utils.addActions(
+            self.menus.autolabel,
+            (
+                predictMode,
+                quit,
+            ),
+        )
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
 
         # Custom context menu for the canvas widget:
@@ -913,7 +933,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
 
     def tutorial(self):
-        url = "https://github.com/wkentaro/labelme/tree/master/examples/tutorial"  # NOQA
+        # url = "https://github.com/wkentaro/labelme/tree/master/examples/tutorial"  # NOQA
+        url = "https://gitlab.com/IsRaTiAl"
         webbrowser.open(url)
 
     def toggleDrawingSensitive(self, drawing=True):
@@ -1497,6 +1518,133 @@ class MainWindow(QtWidgets.QMainWindow):
         # set scroll values
         for orientation in self.scroll_values:
             if self.filename in self.scroll_values[orientation]:
+                self.setScroll(orientation, self.scroll_values[orientation][self.filename])
+        # set brightness constrast values
+        dialog = BrightnessContrastDialog(
+            utils.img_data_to_pil(self.imageData),
+            self.onNewBrightnessContrast,
+            parent=self,
+        )
+        brightness, contrast = self.brightnessContrast_values.get(
+            self.filename, (None, None)
+        )
+        if self._config["keep_prev_brightness"] and self.recentFiles:
+            brightness, _ = self.brightnessContrast_values.get(
+                self.recentFiles[0], (None, None)
+            )
+        if self._config["keep_prev_contrast"] and self.recentFiles:
+            _, contrast = self.brightnessContrast_values.get(
+                self.recentFiles[0], (None, None)
+            )
+        if brightness is not None:
+            dialog.slider_brightness.setValue(brightness)
+        if contrast is not None:
+            dialog.slider_contrast.setValue(contrast)
+        self.brightnessContrast_values[self.filename] = (brightness, contrast)
+        if brightness is not None or contrast is not None:
+            dialog.onNewValue(None)
+        self.paintCanvas()
+        self.addRecentFile(self.filename)
+        self.toggleActions(True)
+        self.status(self.tr("Loaded %s") % osp.basename(str(filename)))
+        return True
+
+    def prediction(self, filename=None):
+        """Load the specified file, or the last opened file if None."""
+        # # changing fileListWidget loads file
+        # if filename in self.imageList and (
+        #     self.fileListWidget.currentRow() != self.imageList.index(filename)
+        # ):
+        #     self.fileListWidget.setCurrentRow(self.imageList.index(filename))
+        #     self.fileListWidget.repaint()
+        #     return
+
+        self.resetState()
+        self.canvas.setEnabled(False)
+        # if filename is None:
+        #     filename = self.settings.value("filename", "")
+        # filename = str(filename)
+        # if not QtCore.QFile.exists(filename):
+        #     self.errorMessage(
+        #         self.tr("Error opening file"),
+        #         self.tr("No such file: <b>%s</b>") % filename,
+        #     )
+        #     return False
+        # assumes same name, but json extension
+        self.status(self.tr("Loading %s...") % osp.basename(str(filename)))
+        label_file = osp.splitext(filename)[0] + ".json"
+        if self.output_dir:
+            label_file_without_path = osp.basename(label_file)
+            label_file = osp.join(self.output_dir, label_file_without_path)
+        if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
+            label_file
+        ):
+            try:
+                self.labelFile = LabelFile(label_file)
+            except LabelFileError as e:
+                self.errorMessage(
+                    self.tr("Error opening file"),
+                    self.tr(
+                        "<p><b>%s</b></p>"
+                        "<p>Make sure <i>%s</i> is a valid label file."
+                    )
+                    % (e, label_file),
+                )
+                self.status(self.tr("Error reading %s") % label_file)
+                return False
+            self.imageData = self.labelFile.imageData
+            self.imagePath = osp.join(
+                osp.dirname(label_file), self.labelFile.imagePath,
+            )
+            self.otherData = self.labelFile.otherData
+        else:
+            self.imageData = LabelFile.load_image_file(filename)
+            if self.imageData:
+                self.imagePath = filename
+            self.labelFile = None
+        image = QtGui.QImage.fromData(self.imageData)
+
+        if image.isNull():
+            formats = [
+                "*.{}".format(fmt.data().decode())
+                for fmt in QtGui.QImageReader.supportedImageFormats()
+            ]
+            self.errorMessage(
+                self.tr("Error opening file"),
+                self.tr(
+                    "<p>Make sure <i>{0}</i> is a valid image file.<br/>"
+                    "Supported image formats: {1}</p>"
+                ).format(filename, ",".join(formats)),
+            )
+            self.status(self.tr("Error reading %s") % filename)
+            return False
+        self.image = image
+        self.filename = filename
+        if self._config["keep_prev"]:
+            prev_shapes = self.canvas.shapes
+        self.canvas.loadPixmap(QtGui.QPixmap.fromImage(image))
+        flags = {k: False for k in self._config["flags"] or []}
+        if self.labelFile:
+            self.loadLabels(self.labelFile.shapes)
+            if self.labelFile.flags is not None:
+                flags.update(self.labelFile.flags)
+        self.loadFlags(flags)
+        if self._config["keep_prev"] and self.noShapes():
+            self.loadShapes(prev_shapes, replace=False)
+            self.setDirty()
+        else:
+            self.setClean()
+        self.canvas.setEnabled(True)
+        # set zoom values
+        is_initial_load = not self.zoom_values
+        if self.filename in self.zoom_values:
+            self.zoomMode = self.zoom_values[self.filename][0]
+            self.setZoom(self.zoom_values[self.filename][1])
+        elif is_initial_load or not self._config["keep_prev_scale"]:
+            self.adjustScale(initial=True)
+        # set scroll values
+        for orientation in self.scroll_values:
+            if self.filename in self.scroll_values[orientation]:
                 self.setScroll(
                     orientation, self.scroll_values[orientation][self.filename]
                 )
@@ -1681,6 +1829,36 @@ class MainWindow(QtWidgets.QMainWindow):
         filename = str(filename)
         if filename:
             self.loadFile(filename)
+
+    def predict(self, _value=False):
+        path = self.filename.split("/")[:-1]
+        path.append("test.json")
+        path = ('/').join(path)
+        print(path)
+
+        if not self.mayContinue():
+            return
+        # path = osp.dirname(str(self.filename)) if self.filename else "."
+        # # formats = [
+        # #     "*.{}".format(fmt.data().decode())
+        # #     for fmt in QtGui.QImageReader.supportedImageFormats()
+        # # ]
+        # filters = self.tr("Label files (%s)") % " ".join(
+        #     # formats +
+        #     ["*%s" % LabelFile.suffix]
+        # )
+        # filename = QtWidgets.QFileDialog.getOpenFileName(
+        #     self,
+        #     self.tr("%s - Choose Label file") % __appname__,
+        #     path,
+        #     filters,
+        # )
+        # if QT5:
+        #     filename, _ = filename
+
+        # filename = str(filename)
+        # if filename:
+        self.prediction(path)
 
     def changeOutputDirDialog(self, _value=False):
         default_output_dir = self.output_dir
