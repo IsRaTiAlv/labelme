@@ -13,18 +13,18 @@ from qtpy.QtCore import Qt
 from qtpy import QtGui
 from qtpy import QtWidgets
 
-from labelme import __appname__
-from labelme import PY2
-from labelme import QT5
+from __init__ import __appname__
+from __init__ import PY2
+from __init__ import QT5
 
 import utils
 from config import get_config
 from label_file import LabelFile
 from label_file import LabelFileError
-from labelme.logger import logger
+import logger
 from labelme.shape import Shape
 from labelme.widgets import BrightnessContrastDialog
-from labelme.widgets import Canvas
+from widgets import Canvas
 from labelme.widgets import LabelDialog
 from labelme.widgets import LabelListWidget
 from labelme.widgets import LabelListWidgetItem
@@ -314,12 +314,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         toggle_keep_prev_mode.setChecked(self._config["keep_prev"])
 
-        predictMode = action(                                                   # Test
+        predictMode = action(
             self.tr("Predict"),
             lambda: self.predict(),
             # shortcuts["create_polygon"],
             "objects",
-            self.tr("Make an inference"),
+            self.tr("Makes an inference using the current image"),
             enabled=False,
         )
         createMode = action(
@@ -1213,8 +1213,9 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setCheckState(Qt.Checked if flag else Qt.Unchecked)
             self.flag_widget.addItem(item)
 
-    def saveLabels(self, filename):
+    def saveLabels(self, filename, mode='manual'):
         lf = LabelFile()
+        print('saving label')
 
         def format_shape(s):
             data = s.other_data.copy()
@@ -1229,13 +1230,22 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return data
 
-        shapes = [format_shape(item.shape()) for item in self.labelList]
         flags = {}
-        for i in range(self.flag_widget.count()):
-            item = self.flag_widget.item(i)
-            key = item.text()
-            flag = item.checkState() == Qt.Checked
-            flags[key] = flag
+        if mode == 'manual':
+            print(filename)
+            shapes = [format_shape(item.shape()) for item in self.labelList]
+            for i in range(self.flag_widget.count()):
+                item = self.flag_widget.item(i)
+                key = item.text()
+                flag = item.checkState() == Qt.Checked
+                flags[key] = flag
+        else:
+            shapes = [{'label': '1',
+                       'points': [(152.53456221198158, 70.35483870967742), (108.7557603686636, 176.80645161290323), (270.5069124423963, 154.68663594470047)],
+                       'group_id': None, 'shape_type': 'polygon', 'flags': {}},
+                      {'label': '2', 'points': [(329.03225806451616, 132.5668202764977), (287.55760368663596, 215.51612903225805), (493.5483870967742, 203.53456221198158)], 'group_id': None, 'shape_type': 'polygon', 'flags': {}}]
+        print(shapes)
+        print(flags)
         try:
             imagePath = osp.relpath(self.imagePath, osp.dirname(filename))
             imageData = self.imageData if self._config["store_data"] else None
@@ -1454,6 +1464,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ):
             try:
                 self.labelFile = LabelFile(label_file)
+                print(self.labelFile)
             except LabelFileError as e:
                 self.errorMessage(
                     self.tr("Error opening file"),
@@ -1472,8 +1483,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.otherData = self.labelFile.otherData
         else:
             self.imageData = LabelFile.load_image_file(filename)
+            self.current_imageData = self.imageData
             if self.imageData:
                 self.imagePath = filename
+                self.currentimagePath = self.imagePath
             self.labelFile = None
         image = QtGui.QImage.fromData(self.imageData)
 
@@ -1499,6 +1512,7 @@ class MainWindow(QtWidgets.QMainWindow):
         flags = {k: False for k in self._config["flags"] or []}
         if self.labelFile:
             self.loadLabels(self.labelFile.shapes)
+            print(self.labelFile.shapes)
             if self.labelFile.flags is not None:
                 flags.update(self.labelFile.flags)
         self.loadFlags(flags)
@@ -1592,16 +1606,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
                 self.status(self.tr("Error reading %s") % label_file)
                 return False
-            self.imageData = self.labelFile.imageData
+            self.imageData = self.current_imageData
             self.imagePath = osp.join(
-                osp.dirname(label_file), self.labelFile.imagePath,
+                osp.dirname(label_file), self.currentimagePath,
             )
-            self.otherData = self.labelFile.otherData
-        else:
-            self.imageData = LabelFile.load_image_file(filename)
-            if self.imageData:
-                self.imagePath = filename
-            self.labelFile = None
+            self.otherData = None
+        # else:
+        #     self.imageData = LabelFile.load_image_file(filename)
+        #     if self.imageData:
+        #         self.imagePath = filename
+        #     self.labelFile = None
         image = QtGui.QImage.fromData(self.imageData)
 
         if image.isNull():
@@ -1619,13 +1633,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status(self.tr("Error reading %s") % filename)
             return False
         self.image = image
-        self.filename = filename
+        # self.filename = filename
         if self._config["keep_prev"]:
             prev_shapes = self.canvas.shapes
         self.canvas.loadPixmap(QtGui.QPixmap.fromImage(image))
         flags = {k: False for k in self._config["flags"] or []}
         if self.labelFile:
             self.loadLabels(self.labelFile.shapes)
+            print(self.labelFile.shapes)
             if self.labelFile.flags is not None:
                 flags.update(self.labelFile.flags)
         self.loadFlags(flags)
@@ -1831,34 +1846,30 @@ class MainWindow(QtWidgets.QMainWindow):
             self.loadFile(filename)
 
     def predict(self, _value=False):
-        path = self.filename.split("/")[:-1]
-        path.append("test.json")
-        path = ('/').join(path)
-        print(path)
-
         if not self.mayContinue():
             return
         # path = osp.dirname(str(self.filename)) if self.filename else "."
-        # # formats = [
-        # #     "*.{}".format(fmt.data().decode())
-        # #     for fmt in QtGui.QImageReader.supportedImageFormats()
-        # # ]
-        # filters = self.tr("Label files (%s)") % " ".join(
-        #     # formats +
-        #     ["*%s" % LabelFile.suffix]
-        # )
+        # filename = (path + '/' + self.filename).split('.')[0] + '.json'
+        # print(filename)
+        # self.saveLabels(filename, mode='auto')
+
+        label_file = osp.splitext(self.imagePath)[0] + ".json"
+        if self.output_dir:
+            label_file_without_path = osp.basename(label_file)
+            label_file = osp.join(self.output_dir, label_file_without_path)
+        self.saveLabels(label_file, mode="auto")
+        # filters = self.tr("Image & Label files (%s)") % " ".join(["*%s" % LabelFile.suffix])
         # filename = QtWidgets.QFileDialog.getOpenFileName(
         #     self,
-        #     self.tr("%s - Choose Label file") % __appname__,
+        #     self.tr("%s - Choose Image or Label file") % __appname__,
         #     path,
         #     filters,
         # )
         # if QT5:
         #     filename, _ = filename
-
         # filename = str(filename)
         # if filename:
-        self.prediction(path)
+        self.prediction(label_file)
 
     def changeOutputDirDialog(self, _value=False):
         default_output_dir = self.output_dir

@@ -2,9 +2,9 @@ from qtpy import QtCore
 from qtpy import QtGui
 from qtpy import QtWidgets
 
-from labelme import QT5
-from labelme.shape import Shape
-import labelme.utils
+from __init__ import QT5
+from shape import Shape
+import utils
 
 
 # TODO(unknown):
@@ -156,6 +156,7 @@ class Canvas(QtWidgets.QWidget):
         if not value:  # Create
             self.unHighlight()
             self.deSelectShape()
+            print('Create a poly')
 
     def unHighlight(self):
         if self.hShape:
@@ -602,19 +603,21 @@ class Canvas(QtWidgets.QWidget):
     def finalise(self):
         assert self.current
         self.current.close()
+        for i in range(len(self.current)):
+            print(self.current[i])
         self.shapes.append(self.current)
         self.storeShapes()
         self.current = None
         self.setHiding(False)
         self.newShape.emit()
-        self.update()
+        # self.update()
 
     def closeEnough(self, p1, p2):
         # d = distance(p1 - p2)
         # m = (p1-p2).manhattanLength()
         # print "d %.2f, m %d, %.2f" % (d, m, d - m)
         # divide by scale to allow more precision when zoomed in
-        return labelme.utils.distance(p1 - p2) < (self.epsilon / self.scale)
+        return utils.distance(p1 - p2) < (self.epsilon / self.scale)
 
     def intersectionPoint(self, p1, p2):
         # Cycle through each image edge in clockwise fashion,

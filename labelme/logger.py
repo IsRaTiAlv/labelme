@@ -9,7 +9,7 @@ if os.name == "nt":  # Windows
 
     colorama.init()
 
-from . import __appname__
+from __init__ import __appname__
 
 
 COLORS = {
