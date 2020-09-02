@@ -9,7 +9,7 @@ import yaml
 from qtpy import QtCore
 from qtpy import QtWidgets
 
-from labelme import __appname__
+from __init__ import __appname__
 from labelme import __version__
 #from labelme.app import MainWindow
 from app import MainWindow

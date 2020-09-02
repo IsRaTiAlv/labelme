@@ -32,6 +32,7 @@ from labelme.widgets import ToolBar
 from labelme.widgets import UniqueLabelQListWidget
 from labelme.widgets import ZoomWidget
 
+from predict import predict
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
@@ -104,6 +105,7 @@ class MainWindow(QtWidgets.QMainWindow):
             fit_to_content=self._config["fit_to_content"],
             flags=self._config["label_flags"],
         )
+        self.model = predict()
 
         self.labelList = LabelListWidget()
         self.lastOpenDir = None
@@ -1215,7 +1217,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveLabels(self, filename, mode='manual'):
         lf = LabelFile()
-        print('saving label')
 
         def format_shape(s):
             data = s.other_data.copy()
@@ -1232,7 +1233,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         flags = {}
         if mode == 'manual':
-            print(filename)
             shapes = [format_shape(item.shape()) for item in self.labelList]
             for i in range(self.flag_widget.count()):
                 item = self.flag_widget.item(i)
@@ -1240,12 +1240,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 flag = item.checkState() == Qt.Checked
                 flags[key] = flag
         else:
-            shapes = [{'label': '1',
-                       'points': [(152.53456221198158, 70.35483870967742), (108.7557603686636, 176.80645161290323), (270.5069124423963, 154.68663594470047)],
-                       'group_id': None, 'shape_type': 'polygon', 'flags': {}},
-                      {'label': '2', 'points': [(329.03225806451616, 132.5668202764977), (287.55760368663596, 215.51612903225805), (493.5483870967742, 203.53456221198158)], 'group_id': None, 'shape_type': 'polygon', 'flags': {}}]
-        print(shapes)
-        print(flags)
+            shapes = self.model.inference(self.filename)
+        # print(shapes)
+        # print(flags)
         try:
             imagePath = osp.relpath(self.imagePath, osp.dirname(filename))
             imageData = self.imageData if self._config["store_data"] else None
@@ -1464,7 +1461,6 @@ class MainWindow(QtWidgets.QMainWindow):
         ):
             try:
                 self.labelFile = LabelFile(label_file)
-                print(self.labelFile)
             except LabelFileError as e:
                 self.errorMessage(
                     self.tr("Error opening file"),
@@ -1512,7 +1508,7 @@ class MainWindow(QtWidgets.QMainWindow):
         flags = {k: False for k in self._config["flags"] or []}
         if self.labelFile:
             self.loadLabels(self.labelFile.shapes)
-            print(self.labelFile.shapes)
+
             if self.labelFile.flags is not None:
                 flags.update(self.labelFile.flags)
         self.loadFlags(flags)
@@ -1640,7 +1636,7 @@ class MainWindow(QtWidgets.QMainWindow):
         flags = {k: False for k in self._config["flags"] or []}
         if self.labelFile:
             self.loadLabels(self.labelFile.shapes)
-            print(self.labelFile.shapes)
+
             if self.labelFile.flags is not None:
                 flags.update(self.labelFile.flags)
         self.loadFlags(flags)
