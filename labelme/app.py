@@ -32,7 +32,8 @@ from labelme.widgets import ToolBar
 from labelme.widgets import UniqueLabelQListWidget
 from labelme.widgets import ZoomWidget
 
-from predict import predict
+# from predict import predict
+from predict_torch import predict
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window

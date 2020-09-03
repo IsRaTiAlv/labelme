@@ -32,7 +32,7 @@ class predict:
         shapes = []
         for i, label in enumerate(labels):
             polygons = Mask(masks[i]).polygons()
-            points = polygons.points[0][::5]
+            points = polygons.points[0][::100]
             points = list(map(tuple, points.astype('float')))
             instance = {'label': self.class_names[label],
                         'points': points,
