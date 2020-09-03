@@ -62,9 +62,11 @@ It is written in Python and uses Qt for its graphical interface.
 ## Autolabeling
 #### Installation
 ```
+In a fresh environment 
+
 git clone https://github.com/IsRaTiAlv/labelme.git
 cd labelme/
-python setup.py 
+python setup.py install 
 pip install labelme
 Install pytorch depending on your enviroment (https://pytorch.org/get-started/locally/)
 pip install scikit-image
