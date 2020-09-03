@@ -59,8 +59,24 @@ It is written in Python and uses Qt for its graphical interface.
 - Python2 / Python3
 - [PyQt4 / PyQt5](http://www.riverbankcomputing.co.uk/software/pyqt/intro) / [PySide2](https://wiki.qt.io/PySide2_GettingStarted)
 
+## Autolabeling
+#### Installation
+```
+git clone https://github.com/IsRaTiAlv/labelme.git
+cd labelme/
+python setup.py 
+pip install labelme
+Install pytorch depending on your enviroment (https://pytorch.org/get-started/locally/)
+pip install scikit-image
+pip install pycocotools
+```
+#### Run
+```
+python labelme/__main__.py
+```
 
 ## Installation
+
 
 There are options:
 
