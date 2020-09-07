@@ -63,7 +63,7 @@ class autolabeling:
             shapes.append(instance)
         return shapes
 
-    def class_inference(self, img_path):
+    def bbox_inference(self, img_path):
         # im = cv2.imread("/home/israel/repos/labelme/examples/test/gait1.jpg")
         _, pred_boxes, labels = self.get_prediction(img_path,0.5)
         # masks = outputs['instances'].pred_masks.to('cpu').numpy()
@@ -78,3 +78,13 @@ class autolabeling:
                         'flags': {}}
             shapes.append(instance)
         return shapes
+
+    def class_inference(self, img_path):
+        # im = cv2.imread("/home/israel/repos/labelme/examples/test/gait1.jpg")
+        _, _, labels = self.get_prediction(img_path,0.5)
+        # masks = outputs['instances'].pred_masks.to('cpu').numpy()
+        # labels = outputs['instances'].pred_classes.to('cpu').numpy()
+        flags = {}
+        for i, name in enumerate(self.class_names):
+            flags.update({name:True if labels[0]==name else False})
+        return flags

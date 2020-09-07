@@ -325,6 +325,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Makes an inference using the current image"),
             enabled=False,
         )
+        auto_bbox = action(
+            self.tr("BoundingBox"),
+            lambda: self.predict(mode='BBox'),
+            # shortcuts["create_polygon"],
+            "objects",
+            self.tr("Makes an inference using the current image"),
+            enabled=False,
+        )
         auto_classification = action(
             self.tr("Classification"),
             lambda: self.predict(mode='Classification'),
@@ -592,7 +600,8 @@ class MainWindow(QtWidgets.QMainWindow):
             removePoint=removePoint,
             createMode=createMode,
             predictMode=predictMode,
-            auto_classification = auto_classification,                                        # test
+            auto_classification = auto_classification,
+            auto_bbox = auto_bbox,
             editMode=editMode,
             createRectangleMode=createRectangleMode,
             createCircleMode=createCircleMode,
@@ -645,6 +654,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 close,
                 createMode,
                 predictMode,
+                auto_bbox,
                 auto_classification,
                 createRectangleMode,
                 createCircleMode,
@@ -719,9 +729,9 @@ class MainWindow(QtWidgets.QMainWindow):
         utils.addActions(
             self.menus.autolabel,
             (
-                predictMode,
                 auto_classification,
-                quit,
+                auto_bbox,
+                predictMode
             ),
         )
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
@@ -1245,6 +1255,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.filename == None:
             self.filename = self.last_filename
         flags = {}
+        shapes = []
         print(self.filename)
         if mode == 'manual':
             shapes = [format_shape(item.shape()) for item in self.labelList]
@@ -1258,7 +1269,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.last_filename = self.filename
 
         elif mode == 'clas':
-            shapes = self.model.class_inference(self.filename)
+            flags = self.model.class_inference(self.filename)
+            self.last_filename = self.filename
+
+        elif mode == 'bbox':
+            shapes = self.model.bbox_inference(self.filename)
             self.last_filename = self.filename
 
         # print(shapes)
@@ -1497,6 +1512,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 osp.dirname(label_file), self.labelFile.imagePath,
             )
             self.otherData = self.labelFile.otherData
+            self.current_imageData = self.imageData
+            self.currentimagePath = self.imagePath
         else:
             self.imageData = LabelFile.load_image_file(filename)
             self.current_imageData = self.imageData
@@ -1878,6 +1895,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.saveLabels(label_file, mode="seg")
         elif mode == 'Classification':
             self.saveLabels(label_file, mode="clas")
+        elif mode == 'BBox':
+            self.saveLabels(label_file, mode='bbox')
         # filters = self.tr("Image & Label files (%s)") % " ".join(["*%s" % LabelFile.suffix])
         # filename = QtWidgets.QFileDialog.getOpenFileName(
         #     self,
