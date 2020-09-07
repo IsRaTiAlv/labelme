@@ -70,7 +70,6 @@ python setup.py install
 pip install labelme
 Install pytorch depending on your enviroment (https://pytorch.org/get-started/locally/)
 pip install scikit-image
-pip install pycocotools
 ```
 #### Run
 ```
