@@ -34,7 +34,10 @@ class autolabeling:
         masks = (pred[0]['masks']>0.5).squeeze().detach().cpu().numpy()
         pred_class = [self.class_names[i] for i in list(pred[0]['labels'].numpy())]
         pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().numpy())]
-        masks = masks[:pred_t+1]
+        if(len(masks.shape)==3):
+            masks = masks[:pred_t+1]
+        else:
+            masks = np.expand_dims(masks,0)
         pred_boxes = pred_boxes[:pred_t+1]
         pred_class = pred_class[:pred_t+1]
         return masks, pred_boxes, pred_class
