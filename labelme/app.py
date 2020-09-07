@@ -22,7 +22,7 @@ from config import get_config
 from label_file import LabelFile
 from label_file import LabelFileError
 import logger
-from labelme.shape import Shape
+from shape import Shape
 from labelme.widgets import BrightnessContrastDialog
 from widgets import Canvas
 from labelme.widgets import LabelDialog
@@ -33,7 +33,7 @@ from labelme.widgets import UniqueLabelQListWidget
 from labelme.widgets import ZoomWidget
 
 # from predict import predict
-from predict_torch import predict
+from predict_torch import autolabeling
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
@@ -106,7 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
             fit_to_content=self._config["fit_to_content"],
             flags=self._config["label_flags"],
         )
-        self.model = predict()
+        self.model = autolabeling()
 
         self.labelList = LabelListWidget()
         self.lastOpenDir = None
@@ -318,8 +318,16 @@ class MainWindow(QtWidgets.QMainWindow):
         toggle_keep_prev_mode.setChecked(self._config["keep_prev"])
 
         predictMode = action(
-            self.tr("Predict"),
-            lambda: self.predict(),
+            self.tr("Semantic Segmentation"),
+            lambda: self.predict(mode = 'segmentation'),
+            # shortcuts["create_polygon"],
+            "objects",
+            self.tr("Makes an inference using the current image"),
+            enabled=False,
+        )
+        auto_classification = action(
+            self.tr("Classification"),
+            lambda: self.predict(mode='Classification'),
             # shortcuts["create_polygon"],
             "objects",
             self.tr("Makes an inference using the current image"),
@@ -583,7 +591,8 @@ class MainWindow(QtWidgets.QMainWindow):
             addPointToEdge=addPointToEdge,
             removePoint=removePoint,
             createMode=createMode,
-            predictMode=predictMode,                                          # test
+            predictMode=predictMode,
+            auto_classification = auto_classification,                                        # test
             editMode=editMode,
             createRectangleMode=createRectangleMode,
             createCircleMode=createCircleMode,
@@ -636,6 +645,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 close,
                 createMode,
                 predictMode,
+                auto_classification,
                 createRectangleMode,
                 createCircleMode,
                 createLineMode,
@@ -710,6 +720,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.menus.autolabel,
             (
                 predictMode,
+                auto_classification,
                 quit,
             ),
         )
@@ -1218,7 +1229,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveLabels(self, filename, mode='manual'):
         lf = LabelFile()
-
         def format_shape(s):
             data = s.other_data.copy()
             data.update(
@@ -1232,7 +1242,10 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return data
 
+        if self.filename == None:
+            self.filename = self.last_filename
         flags = {}
+        print(self.filename)
         if mode == 'manual':
             shapes = [format_shape(item.shape()) for item in self.labelList]
             for i in range(self.flag_widget.count()):
@@ -1240,8 +1253,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 key = item.text()
                 flag = item.checkState() == Qt.Checked
                 flags[key] = flag
-        else:
+        elif mode == 'seg':
             shapes = self.model.inference(self.filename)
+            self.last_filename = self.filename
+
+        elif mode == 'clas':
+            shapes = self.model.class_inference(self.filename)
+            self.last_filename = self.filename
+
         # print(shapes)
         # print(flags)
         try:
@@ -1842,7 +1861,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if filename:
             self.loadFile(filename)
 
-    def predict(self, _value=False):
+    def predict(self, mode):
         if not self.mayContinue():
             return
         # path = osp.dirname(str(self.filename)) if self.filename else "."
@@ -1854,7 +1873,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.output_dir:
             label_file_without_path = osp.basename(label_file)
             label_file = osp.join(self.output_dir, label_file_without_path)
-        self.saveLabels(label_file, mode="auto")
+
+        if mode == 'segmentation':
+            self.saveLabels(label_file, mode="seg")
+        elif mode == 'Classification':
+            self.saveLabels(label_file, mode="clas")
         # filters = self.tr("Image & Label files (%s)") % " ".join(["*%s" % LabelFile.suffix])
         # filename = QtWidgets.QFileDialog.getOpenFileName(
         #     self,

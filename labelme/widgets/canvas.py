@@ -5,7 +5,7 @@ from qtpy import QtWidgets
 from __init__ import QT5
 from shape import Shape
 import utils
-
+import labelme
 
 # TODO(unknown):
 # - [maybe] Find optimal epsilon value.

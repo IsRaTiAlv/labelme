@@ -2,9 +2,10 @@ from PIL import Image
 import torchvision
 import torchvision.transforms as T
 import mask2poly
-from mask2poly import binary_mask_to_polygon
+from skimage import measure
+import numpy as np
 
-class predict:
+class autolabeling:
     def __init__(self):
         self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
         self.model.eval()
@@ -40,18 +41,37 @@ class predict:
 
     def inference(self, img_path):
         # im = cv2.imread("/home/israel/repos/labelme/examples/test/gait1.jpg")
-        masks,_, labels = self.get_prediction(img_path,0.5)
+        masks, _, labels = self.get_prediction(img_path,0.5)
         # masks = outputs['instances'].pred_masks.to('cpu').numpy()
         # labels = outputs['instances'].pred_classes.to('cpu').numpy()
         shapes = []
         for i, label in enumerate(labels):
-            _, _, polygons = binary_mask_to_polygon(masks[i], 0)
+            # _, _, polygons = binary_mask_to_polygon(masks[i], 0)
+            contour = measure.find_contours(masks[i],0)[0]
+            polygons = np.flip(contour, axis=1)
+
             points = polygons[::10]
             points = list(map(tuple, points.astype('float')))
             instance = {'label': label,
                         'points': points,
                         'group_id': None,
                         'shape_type': 'polygon',
+                        'flags': {}}
+            shapes.append(instance)
+        return shapes
+
+    def class_inference(self, img_path):
+        # im = cv2.imread("/home/israel/repos/labelme/examples/test/gait1.jpg")
+        _, pred_boxes, labels = self.get_prediction(img_path,0.5)
+        # masks = outputs['instances'].pred_masks.to('cpu').numpy()
+        # labels = outputs['instances'].pred_classes.to('cpu').numpy()
+        shapes = []
+        for i, label in enumerate(labels):
+            # _, _, polygons = binary_mask_to_polygon(masks[i], 0)
+            instance = {'label': label,
+                        'points': list(([list(map(float,pred_boxes[i][0])), list(map(float,pred_boxes[i][1]))])),
+                        'group_id': None,
+                        'shape_type': 'rectangle',
                         'flags': {}}
             shapes.append(instance)
         return shapes
