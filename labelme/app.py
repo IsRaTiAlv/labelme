@@ -34,7 +34,8 @@ from labelme.widgets import ZoomWidget
 
 # from predict import predict
 from predict_torch import autolabeling
-
+from PyQt5.QtWidgets import QPushButton
+from widgets.AutoWidget import Window
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
 
@@ -107,6 +108,10 @@ class MainWindow(QtWidgets.QMainWindow):
             flags=self._config["label_flags"],
         )
         self.model = autolabeling()
+        self.autolabelWindow = Window()
+        self.autolabelWindow.btn.clicked.connect(self.map_predict)
+        self.predict_dock = QtWidgets.QDockWidget(self.tr('AutoLabeling'), self)
+        self.predict_dock.setWidget(self.autolabelWindow)
 
         self.labelList = LabelListWidget()
         self.lastOpenDir = None
@@ -206,7 +211,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.label_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.shape_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.file_dock)
-
+        self.addDockWidget(Qt.RightDockWidgetArea, self.predict_dock)
         # Actions
         action = functools.partial(utils.newAction, self)
         shortcuts = self._config["shortcuts"]
@@ -321,7 +326,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Semantic Segmentation"),
             lambda: self.predict(mode = 'segmentation'),
             # shortcuts["create_polygon"],
-            "objects",
+            # "objects",
             self.tr("Makes an inference using the current image"),
             enabled=False,
         )
@@ -329,7 +334,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("BoundingBox"),
             lambda: self.predict(mode='BBox'),
             # shortcuts["create_polygon"],
-            "objects",
+            # "objects",
             self.tr("Makes an inference using the current image"),
             enabled=False,
         )
@@ -337,7 +342,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Classification"),
             lambda: self.predict(mode='Classification'),
             # shortcuts["create_polygon"],
-            "objects",
+            # "objects",
             self.tr("Makes an inference using the current image"),
             enabled=False,
         )
@@ -706,6 +711,7 @@ class MainWindow(QtWidgets.QMainWindow):
         utils.addActions(
             self.menus.view,
             (
+                self.predict_dock.toggleViewAction(),
                 self.flag_dock.toggleViewAction(),
                 self.label_dock.toggleViewAction(),
                 self.shape_dock.toggleViewAction(),
@@ -1265,7 +1271,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 flag = item.checkState() == Qt.Checked
                 flags[key] = flag
         elif mode == 'seg':
-            shapes = self.model.inference(self.filename)
+            prate = (self.autolabelWindow.slider_object2.slider.value())
+            shapes = self.model.inference(self.filename,poly_rate=prate)
             self.last_filename = self.filename
 
         elif mode == 'clas':
@@ -1878,7 +1885,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if filename:
             self.loadFile(filename)
 
-    def predict(self, mode):
+    def map_predict(self):
+        type = self.autolabelWindow.buttongroup.checkedId()
+        print(type)
+        if type == 1: mode = 'Classification'
+        if type == 2: mode = 'BBox'
+        if type == 3: mode = 'segmentation'
+        self.predict(mode=mode)
+
+    def predict(self, mode='seg'):
         if not self.mayContinue():
             return
         # path = osp.dirname(str(self.filename)) if self.filename else "."

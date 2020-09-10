@@ -42,7 +42,7 @@ class autolabeling:
         pred_class = pred_class[:pred_t+1]
         return masks, pred_boxes, pred_class
 
-    def inference(self, img_path):
+    def inference(self, img_path, poly_rate = 10):
         # im = cv2.imread("/home/israel/repos/labelme/examples/test/gait1.jpg")
         masks, _, labels = self.get_prediction(img_path,0.5)
         # masks = outputs['instances'].pred_masks.to('cpu').numpy()
@@ -53,7 +53,7 @@ class autolabeling:
             contour = measure.find_contours(masks[i],0)[0]
             polygons = np.flip(contour, axis=1)
 
-            points = polygons[::10]
+            points = polygons[::poly_rate]
             points = list(map(tuple, points.astype('float')))
             instance = {'label': label,
                         'points': points,
