@@ -19,7 +19,7 @@
 <br/>
 
 
-<img src="examples/.repository_files/intro.gif"/>
+<img align="center" src="examples/.repository_files/intro.gif"/>
 <p align="center" ><i>Example of instance segmentation.</i></p>
 
 ## Description
@@ -28,9 +28,7 @@ Autolabelme is a graphical image annotation tool built over [labelme](https://gi
 It is written in Python and uses Qt for its graphical interface.
 
 
-<img src="examples/.repository_files/mask.gif" width="32%" />  
-<img src="examples/.repository_files/bbox.gif" width="33%" />
-<img src="examples/.repository_files/class.gif" width="33%" />
+<img src="examples/.repository_files/mask.gif" width="32%" /><img src="examples/.repository_files/bbox.gif" width="33%" /><img src="examples/.repository_files/class.gif" width="33%" />
 
 <i>Other examples (semantic segmentation, bbox detection, and classification).</i>
 
